@@ -1,5 +1,5 @@
 const APP_ID = "f34e0126cc534ec5af7629916748cda0"
-
+var isMuteVideo = false
 let uid = sessionStorage.getItem('uid')
 if(!uid){
     uid = String(Math.floor(Math.random() * 10000))
@@ -43,6 +43,7 @@ let joinRoomInit = async () => {
     channel.on('MemberJoined', handleMemberJoined)
     channel.on('MemberLeft', handleMemberLeft)
     channel.on('ChannelMessage', handleChannelMessage)
+    //channel.on('ChannelWhiteboard')
 
     getMembers()
     addBotMessageToDom(`Welcome to the room ${displayName}! 👋`)
@@ -54,14 +55,31 @@ let joinRoomInit = async () => {
     client.on('user-left', handleUserLeft)
 }
 
+let channelParameters =
+{
+    // A variable to hold a local audio track.
+    localAudioTrack: null,
+    // A variable to hold a local video track.
+    localVideoTrack: null,
+    // A variable to hold a remote audio track.
+    // remoteAudioTrack: null,
+    // // A variable to hold a remote video track.
+    // remoteVideoTrack: null,
+    // // A variable to hold the remote user id.s
+    // remoteUid: null,
+};
 let joinStream = async () => {
     document.getElementById('join-btn').style.display = 'none'
     document.getElementsByClassName('stream__actions')[0].style.display = 'flex'
 
-    localTracks = await AgoraRTC.createMicrophoneAndCameraTracks({}, {encoderConfig:{
-        width:{min:640, ideal:1920, max:1920},
-        height:{min:480, ideal:1080, max:1080}
-    }})
+    // localTracks = await AgoraRTC.createMicrophoneAndCameraTracks({}, {encoderConfig:{
+    //     width:{min:640, ideal:1920, max:1920},
+    //     height:{min:480, ideal:1080, max:1080}
+    // }})
+
+    channelParameters.localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+    channelParameters.localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+
 
 
     let player = `<div class="video__container" id="user-container-${uid}">
@@ -71,8 +89,8 @@ let joinStream = async () => {
     document.getElementById('streams__container').insertAdjacentHTML('beforeend', player)
     document.getElementById(`user-container-${uid}`).addEventListener('click', expandVideoFrame)
 
-    localTracks[1].play(`user-${uid}`)
-    await client.publish([localTracks[0], localTracks[1]])
+    channelParameters.localVideoTrack.play(`user-${uid}`)
+    await client.publish([channelParameters.localAudioTrack, channelParameters.localVideoTrack])
 }
 
 let switchToCamera = async () => {
@@ -157,12 +175,18 @@ let toggleMic = async (e) => {
 let toggleCamera = async (e) => {
     let button = e.currentTarget
 
-    if(localTracks[1].muted){
-        await localTracks[1].setMuted(false)
+    if(isMuteVideo == false){
+        //await localTracks[1].setMuted(false)
+        await  channelParameters.localVideoTrack.setEnabled(false)
+
         button.classList.add('active')
+        isMuteVideo = true
     }else{
-        await localTracks[1].setMuted(true)
+       // await localTracks[1].setMuted(true)
+        await  channelParameters.localVideoTrack.setEnabled(true)
         button.classList.remove('active')
+        isMuteVideo = false
+
     }
 }
 
