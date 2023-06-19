@@ -330,12 +330,30 @@
   height: 1.5rem;
   fill: #ede0e0;
 }
+.transcribed-text {
+  background: rgba(12, 157, 253, 0.897);
+  padding: 30px;
+  color: white;
+  border-radius: 15px;
+}
+#note,
+#stop-note {
+  background-color: #0C9DFD;
+  color: white;
+  border-radius: 5px;
+}
 
+#note:hover{
+  background-color: rgba(2, 133, 221, 0.911);
+}
 .stream__actions a.active,
-.stream__actions button.active,
+.stream__actions button.active{
+  background-color: red;
+
+}
 .stream__actions a:hover,
 .stream__actions button:hover {
-  background-color: #845695;
+  background-color: red;
 }
 
 #join-btn{

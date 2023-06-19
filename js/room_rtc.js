@@ -1,10 +1,19 @@
 const APP_ID = "f34e0126cc534ec5af7629916748cda0"
 var isMuteVideo = false
+var isAudioVideo = false
+var noteContent = "";
+
 let uid = sessionStorage.getItem('uid')
 if(!uid){
     uid = String(Math.floor(Math.random() * 10000))
     sessionStorage.setItem('uid', uid)
 }
+var SpeechRecognition = window.webkitSpeechRecognition || window.speechRecognition;
+var recognition = new webkitSpeechRecognition() || new SpeechRecognition();
+var transContent = "";
+var noteContent = "";
+recognition.continuous = true;
+var isLoggedIn = false;
 
 let token = null;
 let client;
@@ -44,7 +53,11 @@ let joinRoomInit = async () => {
     channel.on('MemberLeft', handleMemberLeft)
     channel.on('ChannelMessage', handleChannelMessage)
     //channel.on('ChannelWhiteboard')
-
+    // channel.on('ChannelMessage', ({ text }, senderId) => {
+    //     console.log("Message received successfully.");
+    //     console.log("The message is: " + text + " by " + senderId);
+    //     document.getElementById("actual-text").insertAdjacentHTML("afterend","<br> <b>Speaker:</b> " + senderId + "<br> <b>Message:</b> " + text + "<br>");
+    // });
     getMembers()
     addBotMessageToDom(`Welcome to the room ${displayName}! 👋`)
 
@@ -68,6 +81,29 @@ let channelParameters =
     // // A variable to hold the remote user id.s
     // remoteUid: null,
 };
+
+// async function transcribe() {
+//     console.log('Voice recognition is on.');
+//     if (transContent.length) {
+//         transContent += ' ';
+//     }
+//     recognition.start();
+
+//     recognition.onresult = function (event) {
+//         var current = event.resultIndex;
+//         var transcript = event.results[current][0].transcript;
+//         transContent = transContent + transcript + "<br>";
+//         singleMessage = JSON.stringify(transContent);
+//         channel.sendMessage({ text: singleMessage }).then(() => {
+//             console.log("Message sent successfully.");
+//             console.log("Your message was: " + singleMessage + " by " + displayName);
+//             document.getElementById("actual-text").insertAdjacentHTML("afterbegin", "<br> <b>Speaker:</b> " + displayName + "<br> <b>Message:</b> " + singleMessage + "<br>");
+//             transContent = ''
+//         }).catch(error => {
+//             console.log("Message wasn't sent due to an error: ", error);
+//         });
+//     };
+// }
 let joinStream = async () => {
     document.getElementById('join-btn').style.display = 'none'
     document.getElementsByClassName('stream__actions')[0].style.display = 'flex'
@@ -91,6 +127,10 @@ let joinStream = async () => {
 
     channelParameters.localVideoTrack.play(`user-${uid}`)
     await client.publish([channelParameters.localAudioTrack, channelParameters.localVideoTrack])
+
+    //note()
+
+    
 }
 
 let switchToCamera = async () => {
@@ -99,14 +139,14 @@ let switchToCamera = async () => {
                  </div>`
     displayFrame.insertAdjacentHTML('beforeend', player)
 
-    await localTracks[0].setMuted(true)
-    await localTracks[1].setMuted(true)
+    await channelParameters.localAudioTrack.setEnabled(true)
+    await channelParameters.localVideoTrack.setEnabled(true)
 
     document.getElementById('mic-btn').classList.remove('active')
     document.getElementById('screen-btn').classList.remove('active')
 
-    localTracks[1].play(`user-${uid}`)
-    await client.publish([localTracks[1]])
+    channelParameters.localVideoTrack.play(`user-${uid}`)
+    await client.publish([channelParameters.localVideoTrack])
 }
 
 let handleUserPublished = async (user, mediaType) => {
@@ -157,18 +197,25 @@ let handleUserLeft = async (user) => {
             videoFrames[i].style.height = '300px'
             videoFrames[i].style.width = '300px'
         }
+
+        channelParameters.localAudioTrack.close();
+        channelParameters.localVideoTrack.close();
     }
 }
 
 let toggleMic = async (e) => {
     let button = e.currentTarget
 
-    if(localTracks[0].muted){
-        await localTracks[0].setMuted(false)
+    if (isAudioVideo == false){
+        await channelParameters.localAudioTrack.setEnabled(false)
         button.classList.add('active')
+        isAudioVideo = true
+
     }else{
-        await localTracks[0].setMuted(true)
+        await channelParameters.localAudioTrack.setEnabled(true)
         button.classList.remove('active')
+        isAudioVideo = false
+
     }
 }
 
@@ -216,7 +263,7 @@ let toggleScreen = async (e) => {
         userIdInDisplayFrame = `user-container-${uid}`
         localScreenTracks.play(`user-${uid}`)
 
-        await client.unpublish([localTracks[1]])
+        await client.unpublish(channelParameters.localVideoTrack)
         await client.publish([localScreenTracks])
 
         let videoFrames = document.getElementsByClassName('video__container')
@@ -243,13 +290,17 @@ let leaveStream = async (e) => {
 
     document.getElementById('join-btn').style.display = 'block'
     document.getElementsByClassName('stream__actions')[0].style.display = 'none'
-
-    for(let i = 0; localTracks.length > i; i++){
-        localTracks[i].stop()
-        localTracks[i].close()
-    }
-
-    await client.unpublish([localTracks[0], localTracks[1]])
+console.log('====================================');
+    console.log(channelParameters);
+console.log('====================================');
+    // for(let i = 0; localTracks.length > i; i++){
+    //     localTracks[i].stop()
+    //     localTracks[i].close()
+    // }
+    channelParameters.localAudioTrack.close();
+    channelParameters.localVideoTrack.close();
+    //await client.unpublish([localTracks[0], localTracks[1]])
+    await client.unpublish([channelParameters.localAudioTrack, channelParameters.localVideoTrack])
 
     if(localScreenTracks){
         await client.unpublish([localScreenTracks])
@@ -270,12 +321,37 @@ let leaveStream = async (e) => {
 }
 
 
+// let note = async () => {
+//     console.log('Voice recognition is on.');
+    
+//     if (noteContent.length) {
+//         noteContent += ' ';
+//     }
 
+//     recognition.start();
+//     recognition.onresult = function (event) {
+//         var current = event.resultIndex;
+//         var transcript = event.results[current][0].transcript;
+//         noteContent = noteContent + transcript + "<br>";
+//         document.getElementById("note-text").insertAdjacentHTML("afterend","<b><i>You said: </i></b> " + noteContent);
+//         noteContent = '';
+//     };
+// }
+
+// recognition.onerror = function (event) {
+//     if (event.error == 'no-speech') {
+//         console.log('Could you please repeat? I didn\'t get what you\'re saying.');
+//         recognition.stop();
+//         recognition.start();
+//     }
+// }
 document.getElementById('camera-btn').addEventListener('click', toggleCamera)
 document.getElementById('mic-btn').addEventListener('click', toggleMic)
 document.getElementById('screen-btn').addEventListener('click', toggleScreen)
 document.getElementById('join-btn').addEventListener('click', joinStream)
 document.getElementById('leave-btn').addEventListener('click', leaveStream)
-
+// document.getElementById('transcribe-btn').addEventListener('click', transcribe)
 
 joinRoomInit()
+
+// note()
